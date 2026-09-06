@@ -564,9 +564,10 @@ nav {
 .fin-total-item.savings .fin-total-val { color: #ffffff; }
 .fin-total-item.remittance { align-items:flex-start; }
 .fin-total-item.remittance .fin-total-label { padding-top:2px; }
-.fin-total-item.remittance .fin-total-val { font-size:13px; font-weight:600; line-height:1.7; color:#c9b3ff; }
-.fin-total-item.remittance .fin-transfer-line { white-space:nowrap; }
-.fin-total-item.remittance .fin-transfer-rate { opacity:0.65; font-weight:500; font-size:11px; }
+.fin-total-item.remittance .fin-total-val { font-size:13px; font-weight:600; line-height:1.4; color:#c9b3ff; text-align:right; }
+.fin-total-item.remittance .fin-transfer-line { margin-bottom:6px; }
+.fin-total-item.remittance .fin-transfer-line:last-child { margin-bottom:0; }
+.fin-total-item.remittance .fin-transfer-rate { opacity:0.65; font-weight:500; font-size:11px; margin-top:1px; }
 .savings-bar-wrap { margin:0 16px 12px; }
 .savings-bar-track { height:5px; background:var(--surface3); border-radius:3px; overflow:hidden; margin-top:5px; }
 .savings-bar-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,var(--accent),var(--green)); transition:width 0.4s; }
@@ -2011,17 +2012,72 @@ textarea:focus-visible,
   font-family: inherit; cursor: pointer; width: 100%;
 }
 .lock-screen-btn:active { opacity: 0.85; }
-.lock-screen-error { color: #fb923c; font-size: 12px; margin-top: 14px; min-height: 16px; }
+.lock-screen-link {
+  background: none; border: none; color: #a599ff; font-family: inherit;
+  font-size: 14px; font-weight: 600; margin-top: 18px; cursor: pointer; display: block;
+  width: 100%;
+}
+.lock-screen-link:active { opacity: 0.7; }
+
+/* ── Native-style numeric passcode pad ── */
+.pin-pad-view { text-align: center; max-width: 320px; }
+.pin-dots { display: flex; justify-content: center; gap: 14px; margin: 22px 0 10px; }
+.pin-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.5); background: transparent;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.pin-dot.filled { background: #a599ff; border-color: #a599ff; transform: scale(1.1); }
+.pin-dots.pin-shake { animation: pinShake 0.4s ease; }
+@keyframes pinShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-10px); }
+  40% { transform: translateX(10px); }
+  60% { transform: translateX(-8px); }
+  80% { transform: translateX(8px); }
+}
+.pin-pad-error { color: #fb923c; font-size: 12px; min-height: 16px; margin-bottom: 10px; }
+.pin-keypad {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  max-width: 260px; margin: 0 auto;
+}
+.pin-keypad button {
+  aspect-ratio: 1; border-radius: 50%; border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06); color: #fff; font-size: 22px; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+}
+.pin-keypad button:active { background: rgba(255,255,255,0.16); }
+.pin-key-ghost { visibility: hidden; pointer-events: none; }
 </style>
 
 <!-- ══════════════ FACE ID / BIOMETRIC LOCK OVERLAY ══════════════ -->
 <div id="lockScreen" class="lock-screen" style="display:none;">
-  <div class="lock-screen-inner">
-    <div class="lock-screen-icon">🔒</div>
-    <div class="lock-screen-title">My Ledger Locked</div>
-    <div class="lock-screen-desc">Unlock with Face ID / Touch ID to continue</div>
-    <button class="lock-screen-btn" onclick="attemptUnlock()">Unlock</button>
-    <div class="lock-screen-error" id="lockScreenError"></div>
+  <!-- Face ID prompt view — auto-triggers on show, native-lock-screen style (no tap needed) -->
+  <div class="lock-screen-inner" id="lockScreenFaceView">
+    <div class="lock-screen-icon" id="lockScreenIcon">🔒</div>
+    <div class="lock-screen-title" id="lockScreenTitle">My Ledger Locked</div>
+    <div class="lock-screen-desc" id="lockScreenStatus">Unlock with Face ID to continue</div>
+    <button class="lock-screen-btn" id="lockScreenRetryBtn" onclick="attemptUnlock()" style="display:none;">Try Face ID Again</button>
+    <button class="lock-screen-link" id="lockScreenUsePinBtn" onclick="showPinPad('unlock')" style="display:none;">Enter Passcode Instead</button>
+  </div>
+
+  <!-- Native-style numeric passcode pad — shown automatically if Face ID fails/cancels,
+       and also reused for the one-time passcode setup that backs it up. -->
+  <div class="pin-pad-view" id="pinPadView" style="display:none;">
+    <div class="lock-screen-icon">🔢</div>
+    <div class="lock-screen-title" id="pinPadTitle">Enter Passcode</div>
+    <div class="pin-dots" id="pinDots"></div>
+    <div class="pin-pad-error" id="pinPadError">&nbsp;</div>
+    <div class="pin-keypad">
+      <button onclick="pinPress('1')">1</button><button onclick="pinPress('2')">2</button><button onclick="pinPress('3')">3</button>
+      <button onclick="pinPress('4')">4</button><button onclick="pinPress('5')">5</button><button onclick="pinPress('6')">6</button>
+      <button onclick="pinPress('7')">7</button><button onclick="pinPress('8')">8</button><button onclick="pinPress('9')">9</button>
+      <button class="pin-key-ghost" tabindex="-1" aria-hidden="true"></button>
+      <button onclick="pinPress('0')">0</button>
+      <button onclick="pinBackspace()" aria-label="Delete">⌫</button>
+    </div>
+    <button class="lock-screen-link" id="pinPadUseFaceIdBtn" onclick="attemptUnlock()" style="display:none;">Use Face ID Instead</button>
+    <button class="lock-screen-link" id="pinPadCancelBtn" onclick="cancelPinSetup()" style="display:none;">Cancel</button>
   </div>
 </div>
 
@@ -2076,6 +2132,10 @@ textarea:focus-visible,
         <div class="fin-total-item savings">
           <div class="fin-total-label">Saved</div>
           <div class="fin-total-val" id="dashSaved">—</div>
+        </div>
+        <div class="fin-total-item remittance" id="dashRemittanceItem" style="display:none;">
+          <div class="fin-total-label">Remittance</div>
+          <div class="fin-total-val" id="dashRemittance"></div>
         </div>
       </div>
       <div id="dashSavingsRateWrap" style="margin-top:12px;"></div>
@@ -3199,20 +3259,28 @@ const DB = (() => {
 
 // ══════════════════════════════════════════════
 //  FACE ID / BIOMETRIC LOCK — checked immediately (before the rest of the
-//  app initializes) so locked content never flashes on screen first.
+//  app initializes) so locked content never flashes on screen first. The
+//  biometric prompt fires automatically, like a real lock screen — no tap
+//  needed to start the scan (attemptUnlock is defined further down, but
+//  function declarations are hoisted so it's already callable here).
 // ══════════════════════════════════════════════
 if (DB.get('faceIdEnabled') && DB.get('faceIdCredId')) {
   document.getElementById('lockScreen').style.display = 'flex';
   document.getElementById('app').style.visibility = 'hidden';
+  attemptUnlock();
 }
 
 // Re-arm the lock whenever the app is backgrounded/hidden (tab switched,
 // screen locked, app minimized) — not just on first load — so leaving it
 // open doesn't leave your data exposed if someone else picks up the device.
+// Coming back into view re-triggers the biometric scan automatically.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && DB.get('faceIdEnabled') && DB.get('faceIdCredId')) {
+  if (!(DB.get('faceIdEnabled') && DB.get('faceIdCredId'))) return;
+  if (document.visibilityState === 'hidden') {
     document.getElementById('lockScreen').style.display = 'flex';
     document.getElementById('app').style.visibility = 'hidden';
+  } else if (document.getElementById('lockScreen').style.display === 'flex') {
+    attemptUnlock();
   }
 });
 
@@ -3506,6 +3574,15 @@ function renderDashboard() {
   document.getElementById('dashSaved').innerHTML =
     fmtCurAmountGrid(totals.savingsByCur, savCurs, 'saved');
   document.getElementById('dashSaved').style.color = '';
+
+  // Remittance row — same treatment as the Finance page's blue card.
+  const dashRemItem = document.getElementById('dashRemittanceItem');
+  if (totals.remittances.length) {
+    document.getElementById('dashRemittance').innerHTML = fmtRemittanceLines(totals.remittances);
+    dashRemItem.style.display = '';
+  } else {
+    dashRemItem.style.display = 'none';
+  }
 
   // Savings rate bars — one per currency inside the blue card
   const dashRateWrap = document.getElementById('dashSavingsRateWrap');
@@ -4578,12 +4655,15 @@ function handleInstallClick() {
 }
 
 // ══════════════════════════════════════════════
-//  FACE ID / BIOMETRIC LOCK (WebAuthn)
+//  FACE ID / BIOMETRIC LOCK (WebAuthn) + PASSCODE FALLBACK
 //  Registers a platform authenticator credential (Face ID / Touch ID /
 //  fingerprint, whatever the device offers) and requires a fresh
-//  verification each time the app is opened. This gates access on THIS
-//  device only — there's no server to verify signatures against, so treat
-//  it as a convenience app-lock, not bank-grade security.
+//  verification each time the app is opened. A 6-digit passcode is set up
+//  alongside it as a fallback for when the biometric ceremony fails, is
+//  cancelled, or isn't available — same as the device's own lock screen
+//  falling back to a passcode. This gates access on THIS device only —
+//  there's no server to verify signatures against, so treat it as a
+//  convenience app-lock, not bank-grade security.
 // ══════════════════════════════════════════════
 function renderSecuritySettings() {
   const sw = document.getElementById('faceIdSwitch');
@@ -4600,6 +4680,8 @@ async function toggleFaceIdLock() {
   if (enabled) {
     DB.set('faceIdEnabled', false);
     DB.remove('faceIdCredId');
+    DB.remove('facePinHash');
+    DB.remove('facePinSalt');
     renderSecuritySettings();
     toast('🔓 Face ID lock disabled');
     return;
@@ -4622,26 +4704,68 @@ async function toggleFaceIdLock() {
         rp: { name: 'My Ledger' },
         user: { id: userId, name: 'ledger-user', displayName: 'My Ledger' },
         pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
-        authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+        // residentKey: 'discouraged' keeps this a plain per-device biometric
+        // gate rather than an iCloud/Google-synced "passkey" — that's what
+        // was causing the "Sign in with passkey / Use Passkey / More Options"
+        // system sheet instead of a direct Face ID scan.
+        authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'discouraged', requireResidentKey: false, userVerification: 'required' },
         timeout: 60000
       }
     });
     if (!cred) throw new Error('No credential returned');
     const credId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
-    DB.set('faceIdCredId', credId);
-    DB.set('faceIdEnabled', true);
-    renderSecuritySettings();
-    toast('🔒 Face ID lock enabled');
+    pendingFaceIdCredId = credId; // finalized once the backup passcode is set — see finishFaceIdSetup()
+    showPinPad('setupNew');
   } catch (err) {
     toast('⚠️ Could not enable Face ID lock — setup was cancelled or unsupported');
   }
 }
 
+let pendingFaceIdCredId = null;
+
+function finishFaceIdSetup(pin) {
+  hashPin(pin).then(({ hash, salt }) => {
+    DB.set('faceIdCredId', pendingFaceIdCredId);
+    DB.set('faceIdEnabled', true);
+    DB.set('facePinHash', hash);
+    DB.set('facePinSalt', salt);
+    pendingFaceIdCredId = null;
+    renderSecuritySettings();
+    // unlockApp() hides the overlay either way: if this was fresh enrollment
+    // from Settings the app was never actually hidden, so it's a no-op there
+    // beyond closing the overlay; if this was the "migrated" setup mid-unlock,
+    // it genuinely unlocks the app now that a fallback passcode exists.
+    unlockApp();
+    toast('🔒 Face ID lock enabled');
+  });
+}
+
+function cancelPinSetup() {
+  const wasFreshEnrollment = !!pendingFaceIdCredId;
+  pendingFaceIdCredId = null;
+  if (wasFreshEnrollment) {
+    unlockApp(); // just closes the setup overlay — app was never actually locked
+    return;
+  }
+  // Cancelling the "migrated" forced setup during a failed unlock — stay on
+  // the (already-locked) lock screen with a way to retry Face ID.
+  hidePinPad();
+  if (DB.get('faceIdEnabled')) {
+    document.getElementById('lockScreenRetryBtn').style.display = '';
+    document.getElementById('lockScreenStatus').textContent = 'Unlock with Face ID to continue';
+  }
+}
+
+// Auto-triggers the biometric prompt immediately when the lock screen is
+// shown — like a real lock screen, no tap required. Falls back to the
+// passcode pad if it fails, is cancelled, or nothing's enrolled to check
+// against (e.g. Face ID was enabled before the passcode fallback existed).
 async function attemptUnlock() {
-  const errEl = document.getElementById('lockScreenError');
-  if (errEl) errEl.textContent = '';
+  const statusEl = document.getElementById('lockScreenStatus');
+  resetLockScreenToFaceId();
   const credId = DB.get('faceIdCredId');
   if (!credId) { unlockApp(); return; } // nothing enrolled — fail open rather than lock the user out
+  if (statusEl) statusEl.textContent = 'Scanning Face ID…';
   try {
     const challenge = crypto.getRandomValues(new Uint8Array(32));
     const rawId = Uint8Array.from(atob(credId), c => c.charCodeAt(0));
@@ -4653,15 +4777,128 @@ async function attemptUnlock() {
         timeout: 60000
       }
     });
-    if (assertion) unlockApp();
+    if (assertion) { unlockApp(); return; }
+    throw new Error('No assertion');
   } catch (err) {
-    if (errEl) errEl.textContent = 'Face ID failed or was cancelled — tap Unlock to try again';
+    if (DB.get('facePinHash')) {
+      showPinPad('unlock');
+    } else {
+      // Pre-existing enrollment from before the passcode fallback shipped —
+      // ask for one now instead of leaving the person stuck with no way in.
+      if (statusEl) statusEl.textContent = 'Face ID failed — set up a backup passcode';
+      showPinPad('setupNew');
+    }
   }
+}
+
+function resetLockScreenToFaceId() {
+  document.getElementById('lockScreenFaceView').style.display = '';
+  document.getElementById('pinPadView').style.display = 'none';
+  document.getElementById('lockScreenRetryBtn').style.display = 'none';
+  document.getElementById('lockScreenUsePinBtn').style.display = 'none';
 }
 
 function unlockApp() {
   document.getElementById('lockScreen').style.display = 'none';
   document.getElementById('app').style.visibility = '';
+}
+
+// ── Native-style numeric passcode pad ──
+// Reused for both unlocking (mode 'unlock') and the one-time setup flow
+// (modes 'setupNew' then 'setupConfirm') triggered right after enrolling Face ID.
+const PIN_LENGTH = 6;
+let pinMode = 'unlock';
+let pinBuffer = '';
+let pinFirstEntry = '';
+
+function showPinPad(mode) {
+  // Make sure the overlay itself is visible — this gets called both while
+  // genuinely locked (already visible) and during fresh enrollment from
+  // Settings (where the overlay is normally hidden and needs to appear now).
+  document.getElementById('lockScreen').style.display = 'flex';
+  pinMode = mode;
+  pinBuffer = '';
+  pinFirstEntry = '';
+  document.getElementById('lockScreenFaceView').style.display = 'none';
+  document.getElementById('pinPadView').style.display = '';
+  document.getElementById('pinPadError').innerHTML = '&nbsp;';
+  document.getElementById('pinPadTitle').textContent =
+    mode === 'unlock' ? 'Enter Passcode' : mode === 'setupNew' ? 'Set a Backup Passcode' : 'Confirm Passcode';
+  document.getElementById('pinPadUseFaceIdBtn').style.display = (mode === 'unlock' && DB.get('faceIdCredId')) ? '' : 'none';
+  document.getElementById('pinPadCancelBtn').style.display = (mode !== 'unlock') ? '' : 'none';
+  renderPinDots();
+}
+
+function hidePinPad() {
+  document.getElementById('pinPadView').style.display = 'none';
+  resetLockScreenToFaceId();
+}
+
+function renderPinDots() {
+  const wrap = document.getElementById('pinDots');
+  wrap.innerHTML = Array.from({ length: PIN_LENGTH }).map((_, i) =>
+    `<span class="pin-dot${i < pinBuffer.length ? ' filled' : ''}"></span>`
+  ).join('');
+}
+
+function pinPress(digit) {
+  if (pinBuffer.length >= PIN_LENGTH) return;
+  pinBuffer += digit;
+  renderPinDots();
+  if (pinBuffer.length === PIN_LENGTH) submitPin();
+}
+
+function pinBackspace() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  renderPinDots();
+}
+
+function pinError(msg) {
+  document.getElementById('pinPadError').textContent = msg;
+  const dots = document.getElementById('pinDots');
+  dots.classList.remove('pin-shake'); void dots.offsetWidth; dots.classList.add('pin-shake');
+  pinBuffer = '';
+  setTimeout(renderPinDots, 150);
+}
+
+async function submitPin() {
+  if (pinMode === 'unlock') {
+    const salt = DB.get('facePinSalt');
+    const { hash } = await hashPin(pinBuffer, salt);
+    if (hash === DB.get('facePinHash')) {
+      unlockApp();
+    } else {
+      pinError('Incorrect passcode — try again');
+    }
+  } else if (pinMode === 'setupNew') {
+    pinFirstEntry = pinBuffer;
+    pinBuffer = '';
+    pinMode = 'setupConfirm';
+    document.getElementById('pinPadTitle').textContent = 'Confirm Passcode';
+    renderPinDots();
+  } else if (pinMode === 'setupConfirm') {
+    if (pinBuffer === pinFirstEntry) {
+      finishFaceIdSetup(pinBuffer);
+    } else {
+      pinError('Passcodes didn\'t match — start over');
+      pinMode = 'setupNew';
+      pinFirstEntry = '';
+      document.getElementById('pinPadTitle').textContent = 'Set a Backup Passcode';
+    }
+  }
+}
+
+// SHA-256 hash, salted with a random per-device value stored alongside it.
+// This is NOT sent anywhere or checked against a server — it just keeps the
+// raw passcode out of localStorage in plain text on this device.
+async function hashPin(pin, existingSaltB64) {
+  const salt = existingSaltB64
+    ? Uint8Array.from(atob(existingSaltB64), c => c.charCodeAt(0))
+    : crypto.getRandomValues(new Uint8Array(16));
+  const data = new TextEncoder().encode(pin + ':' + btoa(String.fromCharCode(...salt)));
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  const hash = btoa(String.fromCharCode(...new Uint8Array(digest)));
+  return { hash, salt: btoa(String.fromCharCode(...salt)) };
 }
 
 // ══════════════════════════════════════════════
@@ -5427,6 +5664,18 @@ function fmtCurAmountGrid(byCur, orderedCurs, sign) {
   </table>`;
 }
 
+// Shared by the Dashboard and Finance-page blue cards. The rate sits on its
+// own line below the amount — putting it inline after the arrow caused long
+// transfers (e.g. "AED 1,840.00 → INR 50,000.00 (rate 27.17)") to overflow
+// past the card's edge on narrower phones.
+function fmtRemittanceLines(remittances) {
+  return remittances.map(r => `
+    <div class="fin-transfer-line">
+      <div>${r.sentCur} ${fmt(r.sentAmount)} → ${r.receivedCur} ${fmt(r.receivedAmount)}</div>
+      <div class="fin-transfer-rate">rate ${r.rate.toFixed(2)}</div>
+    </div>`).join('');
+}
+
 function getPrimaryCurrency() {
   // The currency of the very first finance entry ever logged = primary
   if (!finEntries.length) return DB.get('lastCurrency') || 'AED';
@@ -5810,15 +6059,12 @@ function renderFinancePage() {
     fmtCurAmountGrid(totals.savingsByCur, savCurs, 'saved');
   document.getElementById('finTotalSavings').style.color = '';
 
-  // Remittance row — one line per self-transfer this month, e.g.
-  // "AED 6,000 → INR 26,000" with the rate underneath. Hidden entirely
-  // when there were no transfers, so it never shows an empty row.
+  // Remittance row — one line per self-transfer this month, rate shown
+  // below the amount (not inline) so it never overflows the card. Hidden
+  // entirely when there were no transfers, so it never shows an empty row.
   const remItem = document.getElementById('finRemittanceItem');
   if (totals.remittances.length) {
-    document.getElementById('finTotalRemittance').innerHTML = totals.remittances.map(r => `
-      <div class="fin-transfer-line">${r.sentCur} ${fmt(r.sentAmount)} → ${r.receivedCur} ${fmt(r.receivedAmount)}
-        <span class="fin-transfer-rate">(rate ${r.rate.toFixed(2)})</span>
-      </div>`).join('');
+    document.getElementById('finTotalRemittance').innerHTML = fmtRemittanceLines(totals.remittances);
     remItem.style.display = '';
   } else {
     remItem.style.display = 'none';
